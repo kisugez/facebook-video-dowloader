@@ -9,22 +9,20 @@ import shutil
 from pathlib import Path
 import logging
 
-# Configure logging
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Facebook Video Downloader API")
 
-# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Update with your frontend URL
+    allow_origins=["http://localhost:3000"],  # Update with frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Create downloads directory if it doesn't exist
 DOWNLOAD_DIR = Path("downloads")
 DOWNLOAD_DIR.mkdir(exist_ok=True)
 
@@ -45,28 +43,23 @@ async def process_video(video_request: VideoRequest):
     try:
         url = str(video_request.url)
         
-        # Check if it's a Facebook URL
+
         if "facebook.com" not in url and "fb.com" not in url:
             raise HTTPException(status_code=400, detail="Not a valid Facebook URL")
-        
-        # Generate a unique ID for this download
         download_id = str(uuid.uuid4())
         download_path = DOWNLOAD_DIR / download_id
         download_path.mkdir(exist_ok=True)
         
-        # Get video info without downloading
         ydl_opts = {
             'format': 'best',
             'noplaylist': True,
             'quiet': True,
             'no_warnings': True,
-            'skip_download': True,  # Just get info first
+            'skip_download': True, 
         }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
-            
-            # Extract available formats
             formats = []
             if 'formats' in info:
                 for format in info.get('formats', []):
@@ -79,7 +72,7 @@ async def process_video(video_request: VideoRequest):
                             'format_note': format.get('format_note', '')
                         })
             
-            # Get thumbnail URL
+            
             thumbnail_url = info.get('thumbnail')
             
             return {
@@ -108,7 +101,6 @@ async def process_video(video_request: VideoRequest):
 @app.get("/api/download/{download_id}")
 async def download_video(download_id: str, format_id: str = "best", background_tasks: BackgroundTasks = None):
     try:
-        # Validate download_id to prevent path traversal
         if not download_id or ".." in download_id or "/" in download_id:
             raise HTTPException(status_code=400, detail="Invalid download ID")
         
@@ -116,25 +108,20 @@ async def download_video(download_id: str, format_id: str = "best", background_t
         if not download_path.exists():
             download_path.mkdir(exist_ok=True)
         
-        # Get the URL from the request data (in a real app, you'd store this in a database)
-        # For demo purposes, we'll pass it as a query parameter
         url = request.query_params.get("url")
         if not url:
             raise HTTPException(status_code=400, detail="URL is required")
         
-        # Download options
         ydl_opts = {
             'format': format_id if format_id != "best" else 'best',
             'outtmpl': str(download_path / '%(title)s.%(ext)s'),
             'noplaylist': True,
         }
         
-        # Download the video
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
             
-            # Clean up function to remove files after download
             def cleanup_files():
                 try:
                     if os.path.exists(filename):
@@ -144,7 +131,6 @@ async def download_video(download_id: str, format_id: str = "best", background_t
                 except Exception as e:
                     logger.error(f"Error cleaning up files: {str(e)}")
             
-            # Schedule cleanup after response is sent
             if background_tasks:
                 background_tasks.add_task(cleanup_files)
             
@@ -163,8 +149,6 @@ async def download_video(download_id: str, format_id: str = "best", background_t
 
 @app.get("/api/thumbnail/{download_id}")
 async def get_thumbnail(download_id: str):
-    # In a real implementation, you would store and serve the actual thumbnail
-    # For now, we'll return a placeholder
     return JSONResponse(
         content={"url": f"/placeholder.svg?height=360&width=640&text=Video+{download_id}"}
     )

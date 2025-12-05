@@ -1,6 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
 
-// This is a proxy endpoint to forward thumbnail requests to the FastAPI backend
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const id = params.id
